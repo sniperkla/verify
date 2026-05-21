@@ -22,7 +22,7 @@ export const authOptions: NextAuthOptions = {
         const password = credentials?.password;
         if (!username || !password) return null;
 
-        const client = await mongoClientPromise;
+        const client = await mongoClientPromise();
         const db = client.db();
         const user = await db.collection("users").findOne<{
           _id: unknown;

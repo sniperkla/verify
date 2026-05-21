@@ -22,7 +22,7 @@ export async function POST(
   }
   const spaceObjectId = new ObjectId(spaceId);
 
-  const client = await mongoClientPromise;
+  const client = await mongoClientPromise();
   const db = client.db();
 
   // Only space admin can create invites

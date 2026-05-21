@@ -59,7 +59,7 @@ async function canAccessApplicant(applicant: ApplicantRecord, userId: string) {
     return false;
   }
 
-  const client = await mongoClientPromise;
+  const client = await mongoClientPromise();
   const db = client.db();
   const membership = await db.collection("space_members").findOne({
     spaceId: applicant.spaceId,
@@ -104,7 +104,7 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const client = await mongoClientPromise;
+  const client = await mongoClientPromise();
   const db = client.db();
   const applicant = await db.collection<ApplicantRecord>("applicants").findOne({
     _id: new ObjectId(applicantId),

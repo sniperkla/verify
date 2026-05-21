@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   const code = body?.code?.trim();
   if (!code) return NextResponse.json({ error: "Invite code is required" }, { status: 400 });
 
-  const client = await mongoClientPromise;
+  const client = await mongoClientPromise();
   const db = client.db();
 
   const invite = await db.collection("space_invites").findOne<{

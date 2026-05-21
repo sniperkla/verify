@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     .filter((value): value is File => value instanceof File && value.size > 0);
   const pdf = form.get("pdf");
 
-  const client = await mongoClientPromise;
+  const client = await mongoClientPromise();
   const db = client.db();
 
   // Authorization for space submissions

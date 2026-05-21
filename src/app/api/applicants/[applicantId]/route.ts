@@ -68,7 +68,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Invalid applicant id" }, { status: 400 });
   }
 
-  const client = await mongoClientPromise;
+  const client = await mongoClientPromise();
   const db = client.db();
   const applicantObjectId = new ObjectId(applicantId);
 

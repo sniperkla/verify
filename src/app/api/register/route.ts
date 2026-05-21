@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const client = await mongoClientPromise;
+  const client = await mongoClientPromise();
   const db = client.db();
   const users = db.collection("users");
 

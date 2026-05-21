@@ -52,7 +52,7 @@ export async function GET(
     }
   } else if (scope === "spaces") {
     if (!ObjectId.isValid(scopeId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    const client = await mongoClientPromise;
+    const client = await mongoClientPromise();
     const db = client.db();
     const membership = await db.collection("space_members").findOne({
       spaceId: new ObjectId(scopeId),

@@ -12,7 +12,7 @@ export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const client = await mongoClientPromise;
+  const client = await mongoClientPromise();
   const db = client.db();
 
   const memberships = await db
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
   const name = body?.name?.trim();
   if (!name) return NextResponse.json({ error: "Space name is required" }, { status: 400 });
 
-  const client = await mongoClientPromise;
+  const client = await mongoClientPromise();
   const db = client.db();
 
   const createdAt = new Date();

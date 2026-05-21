@@ -7,6 +7,8 @@ import path from "node:path";
 import { ObjectId } from "mongodb";
 import { normalizeExtractedIdData } from "@/lib/id-extraction";
 
+export const dynamic = "force-dynamic";
+
 export const runtime = "nodejs";
 
 function sanitizeFilename(name: string) {

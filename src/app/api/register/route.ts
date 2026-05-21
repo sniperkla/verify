@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { mongoClientPromise } from "@/lib/mongodb";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as
     | { username?: string; password?: string }

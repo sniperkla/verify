@@ -4,6 +4,8 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 
+export const dynamic = "force-dynamic";
+
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {

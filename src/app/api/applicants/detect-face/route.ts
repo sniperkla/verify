@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { extractJsonObject, normalizeFaceBox } from "@/lib/id-extraction";
 
+export const dynamic = "force-dynamic";
+
 export const runtime = "nodejs";
 
 function getErrorMessage(error: unknown) {

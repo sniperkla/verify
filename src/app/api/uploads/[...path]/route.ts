@@ -6,6 +6,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { ObjectId } from "mongodb";
 
+export const dynamic = "force-dynamic";
+
 export const runtime = "nodejs";
 
 function guessContentType(filePath: string) {

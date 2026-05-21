@@ -5,6 +5,8 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import crypto from "node:crypto";
 
+export const dynamic = "force-dynamic";
+
 export const runtime = "nodejs";
 
 export async function POST(

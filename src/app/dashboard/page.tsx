@@ -49,7 +49,7 @@ export default async function DashboardPage({
 
   const t = await getTranslationsServer();
 
-  const client = await mongoClientPromise;
+  const client = await mongoClientPromise();
   const db = client.db();
 
   // Await searchParams as required by Next.js 15+

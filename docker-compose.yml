@@ -1,31 +1,39 @@
 services:
   app:
     build:
-      context: /root/collector-app
+      context: .
       dockerfile: Dockerfile
     container_name: collector-app
     restart: unless-stopped
+    # Removed "3000:3000" port mapping. Nginx handles public routing securely.
     environment:
-      MONGODB_URI: mongodb://collector-mongo:27017/collector-app
+      # 1. FIXED: Added credentials, pointed to collector-mongo, and specified the auth source
+      MONGODB_URI: mongodb://collector_user:AaBb1234!@collector-mongo:27017/collector-app?authSource=admin
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-https://your-domain.com}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
     volumes:
       - uploads_data:/app/uploads
-    depends_on:
-      mongo:
+    depends_on: 
+      collector-mongo: # 2. FIXED: Matches the service key name below
         condition: service_healthy
     networks:
       - proxy-net
 
-  mongo:
+  collector-mongo: # 3. FIXED: Changed from 'mongo' to prevent project/network namespace clashes
     image: mongo:7
     container_name: collector-mongo
     restart: unless-stopped
+    environment:
+      # 4. FIXED: Set up secure database root login credentials
+      MONGO_INITDB_ROOT_USERNAME: collector_user
+      MONGO_INITDB_ROOT_PASSWORD: AaBb1234!
+      MONGO_INITDB_DATABASE: collector-app
     volumes:
       - mongo_data:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      # 5. FIXED: Added credentials to healthcheck so it doesn't fail due to unauthorized access
+      test: ["CMD", "mongosh", "-u", "collector_user", "-p", "AaBb1234!", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -41,7 +41,7 @@ export default function ApplicantRow({
   faceImage: string | null;
   idFaceBox: FaceBox | null;
   fallbackFaceSource: string | null;
-  extractedData: ExtractedData;
+  extractedData?: ExtractedData;
   image?: UploadedFile;
   idCard?: UploadedFile;
   pdf?: UploadedFile;

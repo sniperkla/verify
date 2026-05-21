@@ -155,9 +155,9 @@ export default async function DashboardPage({
                 a.extractedData?.croppedFace ||
                 null;
 
-              const idFaceBox = !faceImage ? normalizeFaceBox(
+              const idFaceBox = !faceImage ? (normalizeFaceBox(
                 a.extractedData?.applicantFaceBox ?? a.extractedData?.faceBox
-              ) : null;
+              ) ?? null) : null;
 
               const ext = a.extractedData;
               const fallbackFaceSource = a.files?.image?.path

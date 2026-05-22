@@ -299,6 +299,7 @@ export default function ApplicantRow({
           initialImage={image}
           initialIdCard={idCard}
           initialPdf={pdf}
+          initialApplicationImages={applicationImages}
           onClose={() => setEditOpen(false)}
         />
       )}

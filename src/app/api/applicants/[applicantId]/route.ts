@@ -220,6 +220,45 @@ export async function PATCH(
       if (applicant.files?.pdf?.path) filesToDelete.push(applicant.files.pdf.path);
       $set["files.pdf"] = saved;
     }
+
+    // ── Application images (add / remove) ────────────────────────
+    const appImageIndexesRaw = form.get("applicationImageIndexesToKeep");
+    const newApplicationImages = form.getAll("newApplicationImage");
+
+    if (appImageIndexesRaw !== null || newApplicationImages.length > 0) {
+      let keptIndexes: number[] = [];
+      if (appImageIndexesRaw) {
+        try {
+          const parsed = JSON.parse(String(appImageIndexesRaw));
+          if (Array.isArray(parsed)) {
+            keptIndexes = parsed.filter(
+              (n): n is number => typeof n === "number" && Number.isInteger(n) && n >= 0
+            );
+          }
+        } catch { /* ignore parse errors */ }
+      }
+
+      const existingImages = applicant.files?.applicationImages ?? [];
+      const keptImages: ApplicantFile[] = [];
+
+      existingImages.forEach((img, i) => {
+        if (keptIndexes.includes(i)) {
+          keptImages.push(img);
+        } else {
+          if (img.path) filesToDelete.push(img.path);
+        }
+      });
+
+      const savedNewImages: ApplicantFile[] = [];
+      for (const imgFile of newApplicationImages) {
+        if (imgFile instanceof File && imgFile.size > 0) {
+          const saved = await saveUploadedFile(uploadScopeDir, imgFile);
+          savedNewImages.push(saved);
+        }
+      }
+
+      $set["files.applicationImages"] = [...keptImages, ...savedNewImages];
+    }
   } else {
     // ── JSON: status / description / extractedData updates ──────────
     let body;

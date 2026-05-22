@@ -43,6 +43,10 @@ async function compressImage(
   });
 }
 
+function isImageFilename(name?: string): boolean {
+  return /\.(jpe?g|png|gif|webp|bmp)$/i.test(name ?? "");
+}
+
 type ExtractedData = {
   fullNameEn?: string;
   fullNameTh?: string;
@@ -163,6 +167,7 @@ export default function EditApplicantPanel({
   initialImage,
   initialIdCard,
   initialPdf,
+  initialApplicationImages,
   onClose,
 }: {
   applicantId: string;
@@ -171,6 +176,7 @@ export default function EditApplicantPanel({
   initialImage?: UploadedFile;
   initialIdCard?: UploadedFile;
   initialPdf?: UploadedFile;
+  initialApplicationImages?: UploadedFile[];
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -187,6 +193,12 @@ export default function EditApplicantPanel({
   const [idCardFile, setIdCardFile] = useState<File | null>(null);
   const [idCardPreview, setIdCardPreview] = useState<string | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfPreview, setPdfPreview] = useState<string | null>(null);
+  const [newAppImageFiles, setNewAppImageFiles] = useState<File[]>([]);
+  const [newAppImagePreviews, setNewAppImagePreviews] = useState<string[]>([]);
+  const [keptAppImageIndexes, setKeptAppImageIndexes] = useState<number[]>(
+    () => (initialApplicationImages ?? []).map((_, i) => i)
+  );
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -196,8 +208,10 @@ export default function EditApplicantPanel({
     return () => {
       if (imagePreview) URL.revokeObjectURL(imagePreview);
       if (idCardPreview) URL.revokeObjectURL(idCardPreview);
+      if (pdfPreview) URL.revokeObjectURL(pdfPreview);
+      newAppImagePreviews.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [imagePreview, idCardPreview]);
+  }, [imagePreview, idCardPreview, pdfPreview, newAppImagePreviews]);
 
   const setField = (key: keyof NonNullable<ExtractedData>, value: string) => {
     setExtractedData((prev) => ({ ...(prev ?? {}), [key]: value }));
@@ -207,7 +221,11 @@ export default function EditApplicantPanel({
     setSaving(true);
     setError(null);
     try {
-      const hasFiles = imageFile || idCardFile || pdfFile;
+      const appImagesChanged =
+        newAppImageFiles.length > 0 ||
+        keptAppImageIndexes.length !== (initialApplicationImages?.length ?? 0);
+
+      const hasFiles = imageFile || idCardFile || pdfFile || appImagesChanged;
 
       let res: Response;
 
@@ -221,6 +239,10 @@ export default function EditApplicantPanel({
         if (imageFile) formData.set("image", imageFile);
         if (idCardFile) formData.set("idCard", idCardFile);
         if (pdfFile) formData.set("pdf", pdfFile);
+        if (appImagesChanged) {
+          formData.set("applicationImageIndexesToKeep", JSON.stringify(keptAppImageIndexes));
+          newAppImageFiles.forEach((f) => formData.append("newApplicationImage", f));
+        }
 
         res = await fetch(`/api/applicants/${applicantId}`, {
           method: "PATCH",
@@ -296,7 +318,7 @@ export default function EditApplicantPanel({
       {/* File replacement section */}
       <div className="rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/80 dark:bg-zinc-900/60 p-4 space-y-3">
         <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-          {t("lblApplicantImage")} / {t("lblIdCardImage")} / {t("lblPdfDocument")}
+          {t("lblApplicantImage")} / {t("lblIdCardImage")}
         </p>
 
         <div className="grid gap-3 sm:grid-cols-1">
@@ -332,15 +354,112 @@ export default function EditApplicantPanel({
               setIdCardPreview(url);
             }}
           />
-          <FileSlot
-            label={t("lblPdfDocument")}
-            accept="image/*,application/pdf"
-            isImage={false}
-            currentName={initialPdf?.originalName}
-            file={pdfFile}
-            preview={null}
-            onFileChange={(f) => setPdfFile(f)}
-          />
+          {(() => {
+            const pdfExistingIsImage = isImageFilename(initialPdf?.originalName ?? initialPdf?.path);
+            const pdfCurrIsImage = pdfExistingIsImage || (pdfFile ? pdfFile.type.startsWith("image/") : false);
+            return (
+              <FileSlot
+                label={t("lblPdfDocument")}
+                accept="image/*,application/pdf"
+                isImage={pdfCurrIsImage}
+                currentSrc={
+                  pdfExistingIsImage && initialPdf?.path
+                    ? `/api/applicants/${applicantId}/files?kind=pdf`
+                    : undefined
+                }
+                currentName={initialPdf?.originalName}
+                file={pdfFile}
+                preview={pdfPreview}
+                onFileChange={async (f) => {
+                  if (!f) { setPdfFile(null); setPdfPreview(null); return; }
+                  if (f.type.startsWith("image/")) {
+                    const compressed = await compressImage(f);
+                    const url = URL.createObjectURL(compressed);
+                    setPdfFile(compressed);
+                    setPdfPreview(url);
+                  } else {
+                    setPdfFile(f);
+                    setPdfPreview(null);
+                  }
+                }}
+              />
+            );
+          })()}
+        </div>
+      </div>
+
+      {/* Application images section */}
+      <div className="rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/80 dark:bg-zinc-900/60 p-4 space-y-3">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+          {t("lblApplicationPages")}
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          {(initialApplicationImages ?? []).map((img, index) =>
+            keptAppImageIndexes.includes(index) ? (
+              <div
+                key={img.path}
+                className="relative group aspect-[3/4] rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800"
+              >
+                <img
+                  src={`/api/applicants/${applicantId}/files?kind=applicationImage&index=${index}`}
+                  alt={`Page ${index + 1}`}
+                  className="h-full w-full object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => setKeptAppImageIndexes((prev) => prev.filter((i) => i !== index))}
+                  className="absolute top-1 right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                >
+                  ×
+                </button>
+                <div className="absolute inset-x-0 bottom-0 bg-black/40 px-1.5 py-1 text-[9px] text-white font-medium">
+                  {index + 1}
+                </div>
+              </div>
+            ) : null
+          )}
+          {newAppImagePreviews.map((preview, i) => (
+            <div
+              key={preview}
+              className="relative group aspect-[3/4] rounded-xl overflow-hidden border border-indigo-300 dark:border-indigo-700 bg-zinc-100 dark:bg-zinc-800"
+            >
+              <img src={preview} alt={`New ${i + 1}`} className="h-full w-full object-cover" />
+              <div className="absolute top-1 left-1 rounded-md bg-indigo-600 px-1 py-0.5 text-[8px] text-white font-semibold">
+                new
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  URL.revokeObjectURL(preview);
+                  setNewAppImageFiles((prev) => prev.filter((_, idx) => idx !== i));
+                  setNewAppImagePreviews((prev) => prev.filter((_, idx) => idx !== i));
+                }}
+                className="absolute top-1 right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <label className="aspect-[3/4] rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 hover:border-indigo-400 dark:hover:border-indigo-600 flex flex-col items-center justify-center cursor-pointer transition-colors bg-zinc-50 dark:bg-zinc-900/40">
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="sr-only"
+              onChange={async (e) => {
+                const files = Array.from(e.target.files ?? []);
+                const compressed = await Promise.all(files.map((f) => compressImage(f)));
+                const previews = compressed.map((f) => URL.createObjectURL(f));
+                setNewAppImageFiles((prev) => [...prev, ...compressed]);
+                setNewAppImagePreviews((prev) => [...prev, ...previews]);
+                e.target.value = "";
+              }}
+            />
+            <svg className="h-5 w-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+            </svg>
+            <span className="text-[9px] text-zinc-400 mt-1">Add</span>
+          </label>
         </div>
       </div>
 

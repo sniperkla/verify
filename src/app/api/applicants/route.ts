@@ -114,6 +114,7 @@ export async function POST(req: Request) {
     description,
     files,
     extractedData,
+    status: "pending",
     createdAt: new Date(),
   });
 

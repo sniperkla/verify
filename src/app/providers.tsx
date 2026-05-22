@@ -3,6 +3,7 @@
 import { SessionProvider } from "next-auth/react";
 import type { ReactNode } from "react";
 import { LanguageProvider } from "@/lib/i18n-client";
+import { ThemeProvider } from "@/lib/theme";
 import { Locale } from "@/lib/i18n-translations";
 
 export default function Providers({
@@ -13,9 +14,11 @@ export default function Providers({
   initialLocale: Locale;
 }) {
   return (
-    <LanguageProvider initialLocale={initialLocale}>
-      <SessionProvider>{children}</SessionProvider>
-    </LanguageProvider>
+    <ThemeProvider>
+      <LanguageProvider initialLocale={initialLocale}>
+        <SessionProvider>{children}</SessionProvider>
+      </LanguageProvider>
+    </ThemeProvider>
   );
 }
 

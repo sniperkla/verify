@@ -116,3 +116,69 @@ export async function DELETE(
 
   return NextResponse.json({ ok: true });
 }
+
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ applicantId: string }> }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { applicantId } = await params;
+  if (!ObjectId.isValid(applicantId)) {
+    return NextResponse.json({ error: "Invalid applicant id" }, { status: 400 });
+  }
+
+  let body;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const { status } = body;
+  if (!["pending", "reviewing", "done"].includes(status)) {
+    return NextResponse.json({ error: "Invalid status value" }, { status: 400 });
+  }
+
+  const client = await mongoClientPromise();
+  const db = client.db();
+  const applicantObjectId = new ObjectId(applicantId);
+
+  const applicant = await db.collection<ApplicantRecord>("applicants").findOne({
+    _id: applicantObjectId,
+  });
+
+  if (!applicant) {
+    return NextResponse.json({ error: "Submission not found" }, { status: 404 });
+  }
+
+  let canUpdate = false;
+
+  if (applicant.userId) {
+    canUpdate = applicant.userId === session.user.id;
+  } else if (applicant.spaceId) {
+    const membership = await db.collection("space_members").findOne({
+      spaceId: applicant.spaceId,
+      userId: session.user.id,
+    });
+    canUpdate = Boolean(membership);
+  }
+
+  if (!canUpdate) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const updateResult = await db.collection("applicants").updateOne(
+    { _id: applicantObjectId },
+    { $set: { status } }
+  );
+
+  if (updateResult.matchedCount !== 1) {
+    return NextResponse.json({ error: "Failed to update status" }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
+}

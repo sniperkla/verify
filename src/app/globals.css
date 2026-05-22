@@ -1,13 +1,28 @@
 @import "tailwindcss";
 
+/* ── Tailwind v4: class-based dark mode ───────────────────── */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Light mode tokens ────────────────────────────────────── */
 :root {
   --background: #fafafa;
   --foreground: #09090b;
   --card-bg: rgba(255, 255, 255, 0.75);
   --card-border: rgba(228, 228, 231, 0.8);
-  --primary-accent: #6366f1; /* beautiful indigo */
+  --primary-accent: #6366f1;
   --primary-hover: #4f46e5;
   --glow-color: rgba(99, 102, 241, 0.15);
+}
+
+/* ── Dark mode tokens (via .dark class on <html>) ─────────── */
+html.dark {
+  --background: #030712;
+  --foreground: #f3f4f6;
+  --card-bg: rgba(17, 24, 39, 0.7);
+  --card-border: rgba(31, 41, 55, 0.7);
+  --primary-accent: #818cf8;
+  --primary-hover: #6366f1;
+  --glow-color: rgba(129, 140, 248, 0.15);
 }
 
 @theme inline {
@@ -17,30 +32,44 @@
   --font-mono: var(--font-geist-mono), monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #030712; /* deeper, richer dark background */
-    --foreground: #f3f4f6;
-    --card-bg: rgba(17, 24, 39, 0.7);
-    --card-border: rgba(31, 41, 55, 0.7);
-    --primary-accent: #818cf8;
-    --primary-hover: #6366f1;
-    --glow-color: rgba(129, 140, 248, 0.15);
-  }
+/* ── Base ─────────────────────────────────────────────────── */
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-  background-image: 
+  background-image:
     radial-gradient(at 0% 0%, var(--glow-color) 0px, transparent 50%),
     radial-gradient(at 100% 100%, var(--glow-color) 0px, transparent 50%);
   background-attachment: fixed;
   transition: background-color 0.3s ease, color 0.3s ease;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
-/* Glassmorphism utility */
+/* ── Touch interaction improvements ──────────────────────── */
+button,
+a,
+select,
+input,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* ── Scrollbar hiding utility ─────────────────────────────── */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Glassmorphism utility ────────────────────────────────── */
 .glass-panel {
   background: var(--card-bg);
   backdrop-filter: blur(12px);
@@ -48,11 +77,16 @@ body {
   border: 1px solid var(--card-border);
 }
 
-/* Input enhancements */
+/* ── Input enhancements ───────────────────────────────────── */
 input,
-textarea,
+textarea {
+  font: inherit;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 select {
   font: inherit;
+  -webkit-appearance: none;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -64,7 +98,7 @@ select:focus {
   box-shadow: 0 0 0 3px var(--glow-color);
 }
 
-/* Beautiful animated glow highlights */
+/* ── Hover glow ───────────────────────────────────────────── */
 .hover-glow {
   transition: all 0.3s ease;
 }
@@ -73,3 +107,7 @@ select:focus {
   transform: translateY(-2px);
 }
 
+/* ── Theme transition — smooth switch ────────────────────── */
+html {
+  transition: background-color 0.25s ease;
+}

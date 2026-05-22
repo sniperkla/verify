@@ -5,6 +5,64 @@ import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n-client";
 import { type ExtractedIdData, type FaceBox, normalizeFaceBox } from "@/lib/id-extraction";
 
+/**
+ * Compress an image File using the Canvas API.
+ * - Only processes image/* files (PDFs pass through unchanged).
+ * - Resizes so the longest side ≤ maxPx (default 1920).
+ * - Re-encodes as JPEG at the given quality (default 0.85).
+ * - If the image is already small enough, the original File is returned as-is.
+ */
+async function compressImage(
+  file: File,
+  maxPx = 1920,
+  quality = 0.85
+): Promise<File> {
+  if (!file.type.startsWith("image/")) return file;
+
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const { naturalWidth: w, naturalHeight: h } = img;
+
+      // Already fits — skip re-encoding
+      if (w <= maxPx && h <= maxPx) {
+        resolve(file);
+        return;
+      }
+
+      const scale = maxPx / Math.max(w, h);
+      const outW = Math.round(w * scale);
+      const outH = Math.round(h * scale);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = outW;
+      canvas.height = outH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(file); return; }
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, 0, 0, outW, outH);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { resolve(file); return; }
+          const name = file.name.replace(/\.[^.]+$/, ".jpg");
+          resolve(new File([blob], name, { type: "image/jpeg" }));
+        },
+        "image/jpeg",
+        quality
+      );
+    };
+
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 export default function ApplicantForm({
   onUploaded,
   spaceId,
@@ -87,17 +145,21 @@ export default function ApplicantForm({
 
   const handleImageChange = async (file: File | null) => {
     if (imagePreview) URL.revokeObjectURL(imagePreview);
-    setImage(file);
     resetApplicantFaceDetection();
 
     if (file) {
+      // Show preview immediately from the original for speed
       const previewUrl = URL.createObjectURL(file);
       setImagePreview(previewUrl);
+
+      // Compress before storing / uploading
+      const compressed = await compressImage(file);
+      setImage(compressed);
 
       setDetectingApplicantFace(true);
       try {
         const fd = new FormData();
-        fd.append("image", file);
+        fd.append("image", compressed);
         const res = await fetch("/api/applicants/detect-face", {
           method: "POST",
           body: fd,
@@ -216,22 +278,26 @@ export default function ApplicantForm({
 
   const handleIdCardChange = async (file: File | null) => {
     if (idCardPreview) URL.revokeObjectURL(idCardPreview);
-    setIdCard(file);
     setExtractedData(null);
     setCroppedFace(null);
-    
+
     if (file) {
+      // Show preview immediately
       const previewUrl = URL.createObjectURL(file);
       setIdCardPreview(previewUrl);
+
+      // Compress before AI extraction
+      const compressed = await compressImage(file);
+      setIdCard(compressed);
 
       setExtracting(true);
       setStatus(null);
 
       const extractFd = new FormData();
-      extractFd.append("idCard", file);
+      extractFd.append("idCard", compressed);
 
       const detectFd = new FormData();
-      detectFd.append("image", file);
+      detectFd.append("image", compressed);
 
       try {
         // Run text extraction and face detection in parallel
@@ -271,11 +337,14 @@ export default function ApplicantForm({
     }
   };
 
-  const handleApplicationImagesChange = (files: FileList | null) => {
+  const handleApplicationImagesChange = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    const nextFiles = Array.from(files).filter((file) => file.size > 0);
-    if (nextFiles.length === 0) return;
+    const rawFiles = Array.from(files).filter((f) => f.size > 0);
+    if (rawFiles.length === 0) return;
+
+    // Compress image files in parallel (PDFs pass through unchanged)
+    const nextFiles = await Promise.all(rawFiles.map((f) => compressImage(f)));
 
     setApplicationImages((prev) => {
       const remaining = MAX_APPLICATION_FILES - prev.length;
@@ -712,11 +781,11 @@ export default function ApplicantForm({
 
       <button
         disabled={loading || extracting}
-        className="w-full flex items-center justify-center gap-2 rounded-xl bg-zinc-950 px-4 py-3 text-sm font-semibold text-white shadow hover:bg-zinc-900 focus:outline-none dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 cursor-pointer disabled:opacity-60"
+        className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:from-indigo-500 hover:to-purple-500 hover:shadow-indigo-500/30 hover:scale-[1.01] active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:ring-offset-2 dark:focus:ring-offset-zinc-950 transition-all duration-200 cursor-pointer disabled:opacity-60 disabled:scale-100 disabled:shadow-none"
       >
         {loading ? (
           <>
-            <svg className="animate-spin h-4 w-4 text-current" fill="none" viewBox="0 0 24 24">
+            <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>

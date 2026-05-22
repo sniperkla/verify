@@ -7,54 +7,98 @@ import { useTranslation } from "@/lib/i18n-client";
 export default function RemoveApplicantButton({ applicantId }: { applicantId: string }) {
   const router = useRouter();
   const { t } = useTranslation();
-  const [removing, setRemoving] = useState(false);
+  const [phase, setPhase] = useState<"idle" | "confirm" | "removing">("idle");
   const [error, setError] = useState<string | null>(null);
 
   const handleRemove = async () => {
-    if (removing || !window.confirm(t("confirmRemoveSubmission"))) {
+    if (phase === "removing") return;
+
+    if (phase === "idle") {
+      // First click → show inline confirm
+      setPhase("confirm");
       return;
     }
 
-    setRemoving(true);
+    // Second click (confirmed) → delete
+    setPhase("removing");
     setError(null);
 
     const response = await fetch(`/api/applicants/${encodeURIComponent(applicantId)}`, {
       method: "DELETE",
     });
 
-    setRemoving(false);
-
     if (!response.ok) {
       const data = (await response.json().catch(() => null)) as { error?: string } | null;
       setError(data?.error ?? t("removeFailed"));
+      setPhase("idle");
       return;
     }
 
     router.refresh();
   };
 
-  return (
-    <div className="flex flex-col items-center gap-1">
+  // Idle — just the trash icon
+  if (phase === "idle") {
+    return (
       <button
         type="button"
         onClick={handleRemove}
-        disabled={removing}
-        title={removing ? t("removing") : t("btnRemove")}
-        className="rounded-lg p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+        title={t("btnRemove")}
+        className="rounded-lg p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
       >
-        {removing ? (
-          <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-        ) : (
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
-          </svg>
-        )}
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+        </svg>
       </button>
-      {error ? (
-        <span className="text-[10px] font-medium text-red-500 max-w-[60px] text-center leading-tight">{error}</span>
-      ) : null}
+    );
+  }
+
+  // Removing — spinner
+  if (phase === "removing") {
+    return (
+      <div className="flex items-center gap-1.5 rounded-lg px-2 py-1 bg-red-50 dark:bg-red-950/30">
+        <svg className="h-3.5 w-3.5 animate-spin text-red-500" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        <span className="text-[10px] font-semibold text-red-600 dark:text-red-400">{t("removing")}</span>
+      </div>
+    );
+  }
+
+  // Confirm — inline pill with cancel + confirm
+  return (
+    <div className="flex items-center gap-1">
+      {error && (
+        <span className="text-[9px] font-medium text-red-500">{error}</span>
+      )}
+      <div className="flex items-center gap-1 rounded-lg border border-red-200 dark:border-red-800/50 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5">
+        <span className="text-[9px] font-bold text-red-600 dark:text-red-400 whitespace-nowrap">
+          {t("confirmRemoveSubmission")}?
+        </span>
+        {/* Cancel */}
+        <button
+          type="button"
+          onClick={() => { setPhase("idle"); setError(null); }}
+          className="rounded p-0.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
+          title="Cancel"
+        >
+          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        {/* Confirm delete */}
+        <button
+          type="button"
+          onClick={handleRemove}
+          className="rounded p-0.5 text-red-500 hover:text-red-700 dark:hover:text-red-300 transition-colors"
+          title="Confirm delete"
+        >
+          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }

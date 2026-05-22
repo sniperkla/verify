@@ -40,6 +40,8 @@ export const translations = {
     alreadyHaveAccount: "Already have an account?",
     registerFailed: "Registration failed.",
     invalidLogin: "Invalid username or password.",
+    signInWithGoogle: "Continue with Google",
+    orDivider: "or",
 
     // Workspace Selector
     workspaceSelector: "Workspace Selector",
@@ -87,6 +89,10 @@ export const translations = {
     removing: "Removing...",
     confirmRemoveSubmission: "Are you sure you want to remove this submission? This action cannot be undone.",
     removeFailed: "Failed to remove submission.",
+    statusPending: "Pending",
+    statusReviewing: "Reviewing",
+    statusDone: "Done",
+    filterAll: "All",
 
     // Applicant Form
     newSubmission: "New Submission",
@@ -173,6 +179,8 @@ export const translations = {
     alreadyHaveAccount: "มีบัญชีผู้ใช้อยู่แล้ว?",
     registerFailed: "การสร้างบัญชีล้มเหลว",
     invalidLogin: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
+    signInWithGoogle: "เข้าสู่ระบบด้วย Google",
+    orDivider: "หรือ",
 
     // Workspace Selector
     workspaceSelector: "ตัวสลับพื้นที่ทำงาน",
@@ -220,6 +228,10 @@ export const translations = {
     removing: "กำลังลบ...",
     confirmRemoveSubmission: "คุณแน่ใจหรือไม่ว่าต้องการลบรายการนี้ การกระทำนี้ไม่สามารถย้อนกลับได้",
     removeFailed: "ไม่สามารถลบรายการได้",
+    statusPending: "รอการตรวจสอบ",
+    statusReviewing: "กำลังตรวจสอบ",
+    statusDone: "เสร็จสิ้น",
+    filterAll: "ทั้งหมด",
 
     // Applicant Form
     newSubmission: "แบบฟอร์มส่งข้อมูลใหม่",

@@ -4,11 +4,13 @@ import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { useTranslation } from "@/lib/i18n-client";
+import { useTheme } from "@/lib/theme";
 
 export default function NavBar() {
   const { data } = useSession();
   const pathname = usePathname();
   const { locale, setLocale, t } = useTranslation();
+  const { resolvedTheme, toggleTheme } = useTheme();
 
   const userInitial = data?.user?.name ? data.user.name.charAt(0).toUpperCase() : "U";
 
@@ -44,9 +46,38 @@ export default function NavBar() {
             ))}
           </div>
 
+          {/* ── Theme toggle ─────────────────────────────────────── */}
+          <button
+            onClick={toggleTheme}
+            title={resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            className="flex items-center justify-center w-7 h-7 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-500 hover:text-amber-500 dark:text-zinc-400 dark:hover:text-amber-300 hover:border-amber-200 dark:hover:border-amber-800/50 transition-all cursor-pointer"
+          >
+            {resolvedTheme === "dark" ? (
+              /* Sun icon */
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+                />
+              </svg>
+            ) : (
+              /* Moon icon */
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+                />
+              </svg>
+            )}
+          </button>
+
           {data?.user ? (
             <>
-              {/* Dashboard link — icon on mobile, text on sm+ */}
+              {/* Dashboard link — text on sm+ */}
               <Link
                 href="/dashboard"
                 className={`hidden sm:flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${
@@ -66,7 +97,7 @@ export default function NavBar() {
                 {userInitial}
               </div>
 
-              {/* Sign out — icon on mobile */}
+              {/* Sign out */}
               <button
                 title={t("logout")}
                 onClick={() => signOut({ callbackUrl: "/" })}
@@ -98,4 +129,3 @@ export default function NavBar() {
     </header>
   );
 }
-

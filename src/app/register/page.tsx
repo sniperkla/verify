@@ -1,14 +1,23 @@
 "use client";
 
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n-client";
 
 export default function RegisterPage() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { status } = useSession();
+
+  // Redirect already-authenticated users away from register
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.replace("/dashboard");
+    }
+  }, [status, router]);
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);

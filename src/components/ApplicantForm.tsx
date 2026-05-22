@@ -121,6 +121,7 @@ export default function ApplicantForm({
   // AI Extraction States
   const [extracting, setExtracting] = useState(false);
   const [extractedData, setExtractedData] = useState<ExtractedIdData | null>(null);
+  const [manualEntry, setManualEntry] = useState(false);
   const [croppedFace, setCroppedFace] = useState<string | null>(null);
   const [detectingApplicantFace, setDetectingApplicantFace] = useState(false);
   const [applicantFaceBox, setApplicantFaceBox] = useState<FaceBox | null>(null);
@@ -280,6 +281,7 @@ export default function ApplicantForm({
     if (idCardPreview) URL.revokeObjectURL(idCardPreview);
     setExtractedData(null);
     setCroppedFace(null);
+    setManualEntry(false);
 
     if (file) {
       // Show preview immediately
@@ -420,6 +422,7 @@ export default function ApplicantForm({
     setDescription("");
     setExtractedData(null);
     setCroppedFace(null);
+    setManualEntry(false);
     resetApplicantFaceDetection();
     onUploaded?.();
     router.refresh();
@@ -550,6 +553,20 @@ export default function ApplicantForm({
         </div>
       </div>
 
+      {/* Manual entry trigger — visible when no ID card has been scanned */}
+      {!extracting && !extractedData && (
+        <button
+          type="button"
+          onClick={() => { setManualEntry(true); setExtractedData({}); }}
+          className="flex items-center gap-2 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 px-4 py-2.5 text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:border-indigo-400 hover:text-indigo-500 dark:hover:border-indigo-500 dark:hover:text-indigo-400 transition-colors w-full justify-center"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          {t("manualEntryBtn")}
+        </button>
+      )}
+
       {/* AI Extraction Loading Shimmer */}
       {extracting && (
         <div className="rounded-2xl border border-indigo-100 bg-indigo-50/10 p-5 dark:border-indigo-950/30 dark:bg-indigo-950/10 animate-pulse space-y-4">
@@ -576,12 +593,21 @@ export default function ApplicantForm({
               <span className="flex h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
               <h3 className="text-sm font-bold text-zinc-900 dark:text-white">{t("idPreviewTitle")}</h3>
             </div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-2 py-0.5 text-[10px] font-semibold text-white">
-              <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0L19 7M9 13H6v3l3.586-3.586" />
-              </svg>
-              {t("extractedBadge")}
-            </span>
+            {manualEntry ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-zinc-500 px-2 py-0.5 text-[10px] font-semibold text-white">
+                <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                {t("manualEntryBadge")}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0L19 7M9 13H6v3l3.586-3.586" />
+                </svg>
+                {t("extractedBadge")}
+              </span>
+            )}
           </div>
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">

@@ -137,6 +137,8 @@ export const translations = {
     summarizingDesc: "Summarizing…",
     viewProfile: "View Profile",
     hideProfile: "Hide",
+    manualEntryBtn: "Enter data manually",
+    manualEntryBadge: "Manual Entry",
 
     // Edit submission
     btnEdit: "Edit",
@@ -284,6 +286,8 @@ export const translations = {
     summarizingDesc: "กำลังสรุป…",
     viewProfile: "ดูโปรไฟล์",
     hideProfile: "ซ่อน",
+    manualEntryBtn: "กรอกข้อมูลเอง",
+    manualEntryBadge: "กรอกเอง",
 
     // Edit submission
     btnEdit: "แก้ไข",

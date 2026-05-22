@@ -33,6 +33,9 @@ services:
     image: mongo:7
     container_name: collector-mongo
     restart: unless-stopped
+    ports:
+      - "27019:27017"
+    command: ["mongod", "--bind_ip_all"]
     environment:
       MONGO_INITDB_ROOT_USERNAME: collector_user
       MONGO_INITDB_ROOT_PASSWORD: AaBb1234!
@@ -47,6 +50,7 @@ services:
       start_period: 10s
     networks:
       - proxy-net
+
 
 volumes:
   mongo_data:

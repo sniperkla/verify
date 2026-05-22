@@ -156,6 +156,17 @@ function FileSlot({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13l-3 3m0 0l-3-3m3 3V8m0 13a9 9 0 110-18 9 9 0 010 18z" />
         </svg>
       </label>
+
+      {/* PDF inline preview */}
+      {!isImage && displaySrc && (
+        <div className="rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700" style={{ height: 260 }}>
+          <iframe
+            src={displaySrc}
+            className="w-full h-full"
+            title="PDF preview"
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -363,7 +374,7 @@ export default function EditApplicantPanel({
                 accept="image/*,application/pdf"
                 isImage={pdfCurrIsImage}
                 currentSrc={
-                  pdfExistingIsImage && initialPdf?.path
+                  initialPdf?.path
                     ? `/api/applicants/${applicantId}/files?kind=pdf`
                     : undefined
                 }
@@ -378,8 +389,9 @@ export default function EditApplicantPanel({
                     setPdfFile(compressed);
                     setPdfPreview(url);
                   } else {
+                    const url = URL.createObjectURL(f);
                     setPdfFile(f);
-                    setPdfPreview(null);
+                    setPdfPreview(url);
                   }
                 }}
               />

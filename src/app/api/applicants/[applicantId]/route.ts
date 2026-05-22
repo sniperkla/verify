@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { ObjectId } from "mongodb";
+import { normalizeExtractedIdData } from "@/lib/id-extraction";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,23 @@ function collectUploadPaths(files: ApplicantRecord["files"]) {
   ].filter(
     (filePath): filePath is string => typeof filePath === "string" && filePath.length > 0
   );
+}
+
+function sanitizeFilename(name: string) {
+  return name.replace(/[^\w.\-]+/g, "_");
+}
+
+async function saveUploadedFile(scopeDir: string, file: File) {
+  const uploadsRoot = path.join(process.cwd(), "uploads");
+  const absDir = path.join(uploadsRoot, scopeDir);
+  await fs.mkdir(absDir, { recursive: true });
+  const originalName = file.name || "upload.bin";
+  const safeName = `${Date.now()}_${sanitizeFilename(originalName)}`;
+  const relPath = `${scopeDir}/${safeName}`;
+  const absPath = path.join(uploadsRoot, relPath);
+  const buf = Buffer.from(await file.arrayBuffer());
+  await fs.writeFile(absPath, buf);
+  return { path: relPath, originalName, mime: file.type || "application/octet-stream", size: file.size };
 }
 
 async function deleteUploadedFile(relativePath: string) {
@@ -131,18 +149,6 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid applicant id" }, { status: 400 });
   }
 
-  let body;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-
-  const { status } = body;
-  if (!["pending", "reviewing", "done"].includes(status)) {
-    return NextResponse.json({ error: "Invalid status value" }, { status: 400 });
-  }
-
   const client = await mongoClientPromise();
   const db = client.db();
   const applicantObjectId = new ObjectId(applicantId);
@@ -156,7 +162,6 @@ export async function PATCH(
   }
 
   let canUpdate = false;
-
   if (applicant.userId) {
     canUpdate = applicant.userId === session.user.id;
   } else if (applicant.spaceId) {
@@ -171,13 +176,91 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const $set: Record<string, unknown> = {};
+  const filesToDelete: string[] = [];
+
+  const contentType = req.headers.get("content-type") ?? "";
+
+  if (contentType.includes("multipart/form-data")) {
+    // ── FormData: file replacements + optional text fields ──────────
+    const form = await req.formData();
+
+    const descriptionField = form.get("description");
+    if (descriptionField !== null) $set.description = String(descriptionField);
+
+    const extractedDataRaw = form.get("extractedData");
+    if (extractedDataRaw) {
+      try {
+        $set.extractedData = normalizeExtractedIdData(JSON.parse(String(extractedDataRaw)));
+      } catch { /* ignore parse errors */ }
+    }
+
+    // Determine upload scope dir from existing applicant
+    const uploadScopeDir = applicant.spaceId
+      ? `spaces/${String(applicant.spaceId)}`
+      : `users/${applicant.userId ?? session.user.id}`;
+
+    const imageFile = form.get("image");
+    if (imageFile instanceof File && imageFile.size > 0) {
+      const saved = await saveUploadedFile(uploadScopeDir, imageFile);
+      if (applicant.files?.image?.path) filesToDelete.push(applicant.files.image.path);
+      $set["files.image"] = saved;
+    }
+
+    const idCardFile = form.get("idCard");
+    if (idCardFile instanceof File && idCardFile.size > 0) {
+      const saved = await saveUploadedFile(uploadScopeDir, idCardFile);
+      if (applicant.files?.idCard?.path) filesToDelete.push(applicant.files.idCard.path);
+      $set["files.idCard"] = saved;
+    }
+
+    const pdfFile = form.get("pdf");
+    if (pdfFile instanceof File && pdfFile.size > 0) {
+      const saved = await saveUploadedFile(uploadScopeDir, pdfFile);
+      if (applicant.files?.pdf?.path) filesToDelete.push(applicant.files.pdf.path);
+      $set["files.pdf"] = saved;
+    }
+  } else {
+    // ── JSON: status / description / extractedData updates ──────────
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const { status, description, extractedData } = body;
+
+    if (status !== undefined) {
+      if (!["pending", "reviewing", "done"].includes(status)) {
+        return NextResponse.json({ error: "Invalid status value" }, { status: 400 });
+      }
+      $set.status = status;
+    }
+    if (description !== undefined) $set.description = String(description);
+    if (extractedData !== undefined) {
+      $set.extractedData = extractedData === null
+        ? null
+        : normalizeExtractedIdData(extractedData);
+    }
+  }
+
+  if (Object.keys($set).length === 0) {
+    return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+  }
+
   const updateResult = await db.collection("applicants").updateOne(
     { _id: applicantObjectId },
-    { $set: { status } }
+    { $set }
   );
 
   if (updateResult.matchedCount !== 1) {
-    return NextResponse.json({ error: "Failed to update status" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update" }, { status: 500 });
+  }
+
+  // Clean up old files that were replaced
+  if (filesToDelete.length > 0) {
+    await Promise.allSettled(filesToDelete.map(deleteUploadedFile));
   }
 
   return NextResponse.json({ ok: true });

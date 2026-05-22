@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n-client";
 
@@ -13,14 +13,52 @@ function initials(name: string) {
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 
-function spaceColor(name: string) {
-  const colors = [
-    "bg-violet-500", "bg-indigo-500", "bg-sky-500", "bg-teal-500",
-    "bg-emerald-500", "bg-amber-500", "bg-rose-500", "bg-pink-500",
+function spaceGradient(name: string): string {
+  const gradients = [
+    "from-violet-500 to-purple-600",
+    "from-indigo-500 to-blue-600",
+    "from-sky-400 to-cyan-600",
+    "from-teal-500 to-emerald-600",
+    "from-emerald-400 to-green-600",
+    "from-amber-500 to-orange-600",
+    "from-rose-500 to-red-600",
+    "from-pink-500 to-fuchsia-600",
   ];
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return colors[Math.abs(hash) % colors.length];
+  return gradients[Math.abs(hash) % gradients.length];
+}
+
+function WorkspaceAvatar({
+  name,
+  size = "md",
+}: {
+  name: string;
+  size?: "sm" | "md" | "lg";
+}) {
+  const gradient = spaceGradient(name);
+  const sizeClass =
+    size === "sm"
+      ? "h-6 w-6 text-[9px] rounded-md"
+      : size === "lg"
+      ? "h-10 w-10 text-sm rounded-xl"
+      : "h-8 w-8 text-[11px] rounded-lg";
+  return (
+    <div
+      className={`${sizeClass} bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold shrink-0 shadow-sm select-none`}
+    >
+      {initials(name)}
+    </div>
+  );
+}
+
+function Spinner({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg className={`animate-spin ${className}`} fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
+  );
 }
 
 export default function WorkspaceBar({ currentSpace }: { currentSpace: string }) {
@@ -31,17 +69,25 @@ export default function WorkspaceBar({ currentSpace }: { currentSpace: string })
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Dropdown
+  const [dropOpen, setDropOpen] = useState(false);
+  const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
+
+  // Sub-panels
   const [panel, setPanel] = useState<Panel>(null);
   const [createName, setCreateName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Invite panel state
+  // Invite
   const [inviteRole, setInviteRole] = useState<"admin" | "member">("member");
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // ── Data loading ────────────────────────────────────────────────────────
   const load = async () => {
     setError(null);
     setLoading(true);
@@ -56,20 +102,42 @@ export default function WorkspaceBar({ currentSpace }: { currentSpace: string })
     setSpaces(data.spaces ?? []);
   };
 
-  useEffect(() => {
-    void load();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useEffect(() => { void load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const currentSpaceObj = useMemo(
     () => spaces.find((s) => s.id === currentSpace) ?? null,
     [spaces, currentSpace]
   );
 
-  const onSelect = (value: string) => {
-    setInviteCode(null);
+  // ── Dropdown positioning + outside-click ────────────────────────────────
+  const openDropdown = () => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setDropPos({ top: rect.bottom + 6, left: rect.left, width: Math.max(rect.width, 280) });
+    setDropOpen((v) => !v);
+  };
+
+  useEffect(() => {
+    if (!dropOpen) return;
+    const handler = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target) || dropRef.current?.contains(target)) return;
+      setDropOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
+  }, [dropOpen]);
+
+  // ── Actions ─────────────────────────────────────────────────────────────
+  const onSelect = (id: string) => {
+    setDropOpen(false);
     setPanel(null);
-    router.push(`/dashboard?space=${encodeURIComponent(value)}`);
+    setInviteCode(null);
+    router.push(`/dashboard?space=${encodeURIComponent(id)}`);
   };
 
   const togglePanel = (p: Panel) => {
@@ -155,182 +223,171 @@ export default function WorkspaceBar({ currentSpace }: { currentSpace: string })
   const isAdmin = currentSpaceObj?.role === "admin";
 
   return (
-    <div className="rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60 bg-white/60 dark:bg-zinc-900/40 overflow-hidden">
+    <>
+      {/* ── Main workspace bar ─────────────────────────────────────────── */}
+      <div className="rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60 bg-white/60 dark:bg-zinc-900/40 overflow-hidden">
 
-      {/* ── Header row ───────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-3 py-2.5">
+        {/* Trigger row */}
+        <div className="flex items-center gap-1.5 p-1.5">
 
-        {/* Current workspace avatar + role corner badge */}
-        <div className="relative shrink-0">
-          <div
-            className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-[10px] font-bold select-none
-              ${currentSpaceObj ? spaceColor(currentSpaceObj.name) : "bg-zinc-300 dark:bg-zinc-700"}`}
+          {/* ── Workspace dropdown trigger ─── */}
+          <button
+            ref={triggerRef}
+            type="button"
+            onClick={openDropdown}
+            disabled={loading}
+            className="flex-1 min-w-0 flex items-center gap-2.5 rounded-xl px-2.5 py-2 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/50 transition-colors text-left disabled:opacity-60 group"
           >
-            {currentSpaceObj ? (
-              initials(currentSpaceObj.name)
+            {/* Avatar */}
+            {loading ? (
+              <div className="h-8 w-8 rounded-lg bg-zinc-200 dark:bg-zinc-800 animate-pulse shrink-0" />
+            ) : currentSpaceObj ? (
+              <WorkspaceAvatar name={currentSpaceObj.name} />
             ) : (
-              <svg className="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5" />
-              </svg>
-            )}
-          </div>
-          {/* Role badge — tiny corner overlay */}
-          {currentSpaceObj && (
-            <span
-              className={`absolute -bottom-1 -right-1 rounded-full text-[7px] font-extrabold leading-none px-1 py-0.5 border border-white dark:border-zinc-900 uppercase tracking-wide
-                ${currentSpaceObj.role === "admin"
-                  ? "bg-indigo-600 text-white"
-                  : "bg-zinc-400 dark:bg-zinc-600 text-white"
-                }`}
-            >
-              {currentSpaceObj.role === "admin" ? "A" : "M"}
-            </span>
-          )}
-        </div>
-
-        {/* Workspace selector */}
-        <div className="relative flex-1 min-w-0">
-          {spaces.length > 0 ? (
-            <>
-              <select
-                className="w-full appearance-none rounded-lg border border-zinc-200 dark:border-zinc-700 bg-transparent pl-2 pr-7 py-1.5 text-sm font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer truncate"
-                value={currentSpace}
-                onChange={(e) => onSelect(e.target.value)}
-                disabled={loading}
-              >
-                {spaces.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2 text-zinc-400">
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+              <div className="h-8 w-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0">
+                <svg className="h-4 w-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5" />
                 </svg>
               </div>
-            </>
-          ) : (
-            <p className="pl-1 text-xs text-zinc-400 dark:text-zinc-500 italic">
-              {loading ? "Loading…" : "No workspaces yet — create one →"}
-            </p>
-          )}
-        </div>
+            )}
 
-        {/* Role pill — only when in a named space, hidden on very small screens to save space */}
-        {currentSpaceObj && (
-          <span className="hidden sm:inline-flex shrink-0 rounded-md bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
-            {currentSpaceObj.role}
-          </span>
-        )}
-
-        {/* Action icon buttons — larger touch targets on mobile */}
-        <div className="shrink-0 flex items-center gap-1">
-          {/* Invite — only for space admin */}
-          {isAdmin && (
-            <button
-              onClick={() => togglePanel("invite")}
-              title={t("generateInviteCode")}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors cursor-pointer
-                ${panel === "invite"
-                  ? "border-indigo-300 dark:border-indigo-700 bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300"
-                  : "border-indigo-200 dark:border-indigo-800/60 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
-                }`}
-            >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-              </svg>
-            </button>
-          )}
-
-          {/* New space */}
-          <button
-            onClick={() => togglePanel("create")}
-            title={t("createNewSpace")}
-            className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors cursor-pointer
-              ${panel === "create"
-                ? "border-indigo-300 dark:border-indigo-700 bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300"
-                : "border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-              }`}
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
-
-          {/* Join space */}
-          <button
-            onClick={() => togglePanel("join")}
-            title={t("joinSpace")}
-            className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors cursor-pointer
-              ${panel === "join"
-                ? "border-zinc-400 dark:border-zinc-500 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200"
-                : "border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-              }`}
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      {/* ── Invite panel ──────────────────────────────────────────── */}
-      {panel === "invite" && isAdmin && (
-        <div className="mx-3 mb-2 rounded-xl border border-indigo-200/60 dark:border-indigo-800/40 bg-indigo-50/50 dark:bg-indigo-950/20 overflow-hidden">
-          {/* Role picker + generate button row */}
-          <div className="flex flex-wrap items-center gap-1.5 px-2.5 py-2 border-b border-indigo-100 dark:border-indigo-900/30">
-            <span className="text-[9px] font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-wide shrink-0">
-              {t("role")}
-            </span>
-            <div className="flex gap-1">
-              {(["member", "admin"] as const).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => { setInviteRole(r); setInviteCode(null); }}
-                  className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors cursor-pointer
-                    ${
-                      inviteRole === r
-                        ? "bg-indigo-600 text-white"
-                        : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50"
-                    }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-            {/* Generate button */}
-            <button
-              onClick={generateInvite}
-              disabled={inviteLoading}
-              className="flex items-center gap-1 rounded-md bg-indigo-600 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors cursor-pointer sm:ml-auto"
-            >
-              {inviteLoading ? (
-                <svg className="animate-spin h-2.5 w-2.5" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
+            {/* Name + role */}
+            <div className="flex-1 min-w-0">
+              {loading ? (
+                <div className="space-y-1.5">
+                  <div className="h-3 w-28 rounded bg-zinc-200 dark:bg-zinc-800 animate-pulse" />
+                  <div className="h-2.5 w-14 rounded bg-zinc-100 dark:bg-zinc-800/60 animate-pulse" />
+                </div>
               ) : (
-                <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
-                </svg>
+                <>
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate leading-tight">
+                    {currentSpaceObj?.name ?? "Select workspace"}
+                  </p>
+                  {currentSpaceObj && (
+                    <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 capitalize leading-tight mt-0.5">
+                      {currentSpaceObj.role}
+                    </p>
+                  )}
+                </>
               )}
-              {t("generateInviteCode")}
+            </div>
+
+            {/* Chevron */}
+            <svg
+              className={`h-4 w-4 text-zinc-400 dark:text-zinc-500 shrink-0 transition-transform duration-200 ${dropOpen ? "rotate-180" : ""}`}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {/* Divider */}
+          <div className="h-7 w-px bg-zinc-200 dark:bg-zinc-800 shrink-0" />
+
+          {/* ── Action buttons ─── */}
+          <div className="flex items-center gap-0.5 pr-0.5 shrink-0">
+            {/* Invite — admin only */}
+            {isAdmin && (
+              <button
+                onClick={() => togglePanel("invite")}
+                title={t("generateInviteCode")}
+                className={`h-9 flex items-center gap-1.5 px-2.5 rounded-xl text-[11px] font-semibold transition-colors cursor-pointer ${
+                  panel === "invite"
+                    ? "bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300"
+                    : "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
+                }`}
+              >
+                <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+                <span className="hidden sm:inline whitespace-nowrap">{t("generateInviteCode")}</span>
+              </button>
+            )}
+
+            {/* New space */}
+            <button
+              onClick={() => togglePanel("create")}
+              title={t("createNewSpace")}
+              className={`h-9 flex items-center gap-1.5 px-2.5 rounded-xl text-[11px] font-semibold transition-colors cursor-pointer ${
+                panel === "create"
+                  ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-100"
+                  : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              }`}
+            >
+              <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              </svg>
+              <span className="hidden sm:inline">{t("btnCreate")}</span>
+            </button>
+
+            {/* Join space */}
+            <button
+              onClick={() => togglePanel("join")}
+              title={t("joinSpace")}
+              className={`h-9 flex items-center gap-1.5 px-2.5 rounded-xl text-[11px] font-semibold transition-colors cursor-pointer ${
+                panel === "join"
+                  ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-100"
+                  : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              }`}
+            >
+              <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+              </svg>
+              <span className="hidden sm:inline">{t("btnJoin")}</span>
             </button>
           </div>
+        </div>
 
-          {/* Generated code display */}
-          {inviteCode && (
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 px-3 py-2.5">
-              <span className="shrink-0 rounded bg-indigo-100 dark:bg-indigo-900/40 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-indigo-500">
-                {inviteRole}
-              </span>
-              {/* Code — full width on its own line on mobile */}
-              <div className="flex flex-1 items-center gap-2 min-w-0 w-full">
-                <p className="flex-1 min-w-0 font-mono text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 truncate break-all">
+        {/* ── Invite panel ────────────────────────────────────────────── */}
+        {panel === "invite" && isAdmin && (
+          <div className="border-t border-zinc-100 dark:border-zinc-800/60 px-4 py-4 space-y-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+              {t("teammateInvites")}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Role segmented control */}
+              <div className="flex items-center gap-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 p-0.5">
+                {(["member", "admin"] as const).map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => { setInviteRole(r); setInviteCode(null); }}
+                    className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer capitalize ${
+                      inviteRole === r
+                        ? "bg-white dark:bg-zinc-700 text-zinc-800 dark:text-white shadow-sm"
+                        : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+              {/* Generate button */}
+              <button
+                onClick={generateInvite}
+                disabled={inviteLoading}
+                className="flex items-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-60 transition-colors cursor-pointer shadow-sm shadow-indigo-500/20"
+              >
+                {inviteLoading ? <Spinner className="h-3 w-3" /> : (
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
+                  </svg>
+                )}
+                {t("generateInviteCode")}
+              </button>
+            </div>
+
+            {/* Generated code */}
+            {inviteCode && (
+              <div className="flex items-center gap-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 px-3 py-2.5">
+                <span className="shrink-0 rounded-md bg-indigo-100 dark:bg-indigo-950/60 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                  {inviteRole}
+                </span>
+                <p className="flex-1 min-w-0 font-mono text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">
                   {inviteCode}
                 </p>
                 <button
                   onClick={handleCopy}
-                  className="shrink-0 flex items-center gap-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-[10px] font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 transition-colors cursor-pointer"
+                  className="shrink-0 flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 px-2.5 py-1.5 text-[10px] font-semibold text-zinc-600 dark:text-zinc-300 transition-colors cursor-pointer"
                 >
                   {copied ? (
                     <>
@@ -344,73 +401,160 @@ export default function WorkspaceBar({ currentSpace }: { currentSpace: string })
                       <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
-                      <span>{t("btnCopyCode")}</span>
+                      {t("btnCopyCode")}
                     </>
                   )}
                 </button>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Create panel ─────────────────────────────────────────────── */}
+        {panel === "create" && (
+          <div className="border-t border-zinc-100 dark:border-zinc-800/60 px-4 py-4 space-y-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+              {t("createNewSpace")}
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                className="flex-1 min-w-0 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50"
+                placeholder={t("createSpacePlaceholder")}
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && createSpace()}
+                autoFocus
+              />
+              <button
+                onClick={createSpace}
+                disabled={actionLoading || !createName.trim()}
+                className="shrink-0 flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 transition-colors cursor-pointer shadow-sm shadow-indigo-500/20"
+              >
+                {actionLoading ? <Spinner className="h-4 w-4" /> : t("btnCreate")}
+              </button>
             </div>
-          )}
+          </div>
+        )}
+
+        {/* ── Join panel ───────────────────────────────────────────────── */}
+        {panel === "join" && (
+          <div className="border-t border-zinc-100 dark:border-zinc-800/60 px-4 py-4 space-y-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+              {t("joinSpace")}
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                className="flex-1 min-w-0 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-200 font-mono placeholder:text-zinc-400 placeholder:font-sans dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50"
+                placeholder={t("joinSpacePlaceholder")}
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && joinSpace()}
+                autoFocus
+              />
+              <button
+                onClick={joinSpace}
+                disabled={actionLoading || !joinCode.trim()}
+                className="shrink-0 flex items-center gap-1.5 rounded-xl border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-700 dark:text-zinc-200 disabled:opacity-60 transition-colors cursor-pointer"
+              >
+                {actionLoading ? <Spinner className="h-4 w-4" /> : t("btnJoin")}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Error ────────────────────────────────────────────────────── */}
+        {error && (
+          <div className="border-t border-red-100 dark:border-red-900/20 px-4 py-2.5 flex items-center gap-2 bg-red-50/50 dark:bg-red-950/10">
+            <svg className="h-3.5 w-3.5 text-red-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <p className="text-[11px] font-medium text-red-600 dark:text-red-400">{error}</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Custom floating dropdown ──────────────────────────────────────── */}
+      {dropOpen && dropPos && (
+        <div
+          ref={dropRef}
+          style={{
+            position: "fixed",
+            top: dropPos.top,
+            left: dropPos.left,
+            width: dropPos.width,
+            zIndex: 9999,
+          }}
+          className="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-2xl shadow-black/10 dark:shadow-black/40 overflow-hidden"
+        >
+          {/* Workspace list */}
+          <div className="py-1.5 max-h-60 overflow-y-auto">
+            {spaces.length === 0 ? (
+              <p className="px-4 py-3 text-sm text-zinc-400 dark:text-zinc-500 text-center italic">
+                No workspaces yet — create one →
+              </p>
+            ) : (
+              spaces.map((s) => {
+                const isActive = s.id === currentSpace;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => onSelect(s.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors cursor-pointer ${
+                      isActive
+                        ? "bg-indigo-50 dark:bg-indigo-950/40"
+                        : "hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
+                    }`}
+                  >
+                    <WorkspaceAvatar name={s.name} size="sm" />
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold truncate ${isActive ? "text-indigo-700 dark:text-indigo-300" : "text-zinc-800 dark:text-zinc-200"}`}>
+                        {s.name}
+                      </p>
+                      <p className="text-[10px] capitalize font-medium text-zinc-400 dark:text-zinc-500 leading-tight">
+                        {s.role}
+                      </p>
+                    </div>
+                    {isActive && (
+                      <svg className="h-4 w-4 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          {/* Footer actions */}
+          <div className="border-t border-zinc-100 dark:border-zinc-800 py-1.5">
+            <button
+              type="button"
+              onClick={() => { setDropOpen(false); togglePanel("create"); }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors cursor-pointer"
+            >
+              <div className="h-6 w-6 rounded-md bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0">
+                <svg className="h-3.5 w-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                </svg>
+              </div>
+              <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">{t("createNewSpace")}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setDropOpen(false); togglePanel("join"); }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors cursor-pointer"
+            >
+              <div className="h-6 w-6 rounded-md bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0">
+                <svg className="h-3.5 w-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                </svg>
+              </div>
+              <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">{t("joinSpace")}</span>
+            </button>
+          </div>
         </div>
       )}
-
-      {/* ── Create panel ──────────────────────────────────────────── */}
-      {panel === "create" && (
-        <div className="mx-3 mb-2 flex items-center gap-1.5 rounded-xl border border-indigo-200/60 dark:border-indigo-800/40 bg-indigo-50/50 dark:bg-indigo-950/20 px-3 py-2.5">
-          <svg className="shrink-0 h-3.5 w-3.5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-          </svg>
-          <input
-            className="flex-1 min-w-0 bg-transparent text-xs text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none py-1"
-            placeholder={t("createSpacePlaceholder")}
-            value={createName}
-            onChange={(e) => setCreateName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && createSpace()}
-            autoFocus
-          />
-          <button
-            onClick={createSpace}
-            disabled={actionLoading || !createName.trim()}
-            className="shrink-0 rounded-lg bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors cursor-pointer"
-          >
-            {actionLoading ? "…" : t("btnCreate")}
-          </button>
-        </div>
-      )}
-
-      {/* ── Join panel ────────────────────────────────────────────── */}
-      {panel === "join" && (
-        <div className="mx-3 mb-2 flex items-center gap-1.5 rounded-xl border border-zinc-200/60 dark:border-zinc-700/40 bg-zinc-50/50 dark:bg-zinc-800/20 px-3 py-2.5">
-          <svg className="shrink-0 h-3.5 w-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-          </svg>
-          <input
-            className="flex-1 min-w-0 bg-transparent text-xs text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none font-mono py-1"
-            placeholder={t("joinSpacePlaceholder")}
-            value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && joinSpace()}
-            autoFocus
-          />
-          <button
-            onClick={joinSpace}
-            disabled={actionLoading || !joinCode.trim()}
-            className="shrink-0 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-3 py-1.5 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 disabled:opacity-50 transition-colors cursor-pointer"
-          >
-            {actionLoading ? "…" : t("btnJoin")}
-          </button>
-        </div>
-      )}
-
-      {/* ── Error ─────────────────────────────────────────────────── */}
-      {error && (
-        <p className="px-3 pb-2.5 text-[11px] font-medium text-red-500 dark:text-red-400 flex items-center gap-1">
-          <svg className="h-3 w-3 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-          </svg>
-          {error}
-        </p>
-      )}
-    </div>
+    </>
   );
 }

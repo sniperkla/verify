@@ -37,9 +37,16 @@ export default function LoginPage() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Show error from URL param (?error=CredentialsSignin) — NextAuth sometimes
+  // redirects here instead of returning res.ok=false when credentials fail.
+  const [error, setError] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const param = new URL(window.location.href).searchParams.get("error");
+    return param ? t("invalidLogin") : null;
+  });
 
   // ── Credentials sign-in ───────────────────────────────────────────────────
   const onSubmit = async (e: React.FormEvent) => {
@@ -47,22 +54,27 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
-    const res = await signIn("credentials", {
-      username,
-      password,
-      redirect: false,
-      callbackUrl,
-    });
+    try {
+      const res = await signIn("credentials", {
+        username,
+        password,
+        redirect: false,
+        callbackUrl,
+      });
 
-    setLoading(false);
+      setLoading(false);
 
-    if (!res?.ok) {
+      if (!res?.ok || res?.error) {
+        setError(t("invalidLogin"));
+        return;
+      }
+
+      // res.url may be an absolute URL — extract only the pathname to avoid router issues
+      router.push(safeRedirectPath(res.url) || callbackUrl);
+    } catch {
+      setLoading(false);
       setError(t("invalidLogin"));
-      return;
     }
-
-    // res.url may be an absolute URL — extract only the pathname to avoid router issues
-    router.push(safeRedirectPath(res.url) || callbackUrl);
   };
 
   // ── Google sign-in ────────────────────────────────────────────────────────

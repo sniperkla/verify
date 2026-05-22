@@ -210,6 +210,7 @@ export default async function DashboardPage({
                       month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
                     });
                     const canRemove = a.createdBy === user.id || currentSpaceRole === "admin";
+                    const canEdit = currentSpaceRole === "admin";
 
                     const faceImage =
                       a.extractedData?.applicantCroppedFace ||
@@ -233,6 +234,7 @@ export default async function DashboardPage({
                         applicantId={id}
                         when={when}
                         canRemove={canRemove}
+                        canEdit={canEdit}
                         description={a.description}
                         faceImage={faceImage}
                         idFaceBox={idFaceBox}

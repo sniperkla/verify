@@ -137,11 +137,14 @@ export async function GET(
   }
 
   const filename = selectedFile.originalName || path.basename(absolutePath);
+  // RFC 5987 — safe for any Unicode filename (fixes crash on Thai/CJK filenames)
+  const encodedFilename = encodeURIComponent(filename).replace(/'/g, "%27");
+  const asciiFilename = filename.replace(/[^\x20-\x7E]/g, "_").replace(/"/g, "");
 
   return new Response(buffer, {
     headers: {
       "Content-Type": guessContentType(absolutePath),
-      "Content-Disposition": `inline; filename="${filename.replace(/"/g, "")}"`,
+      "Content-Disposition": `inline; filename="${asciiFilename}"; filename*=UTF-8''${encodedFilename}`,
       "Cache-Control": "private, no-store",
       "X-Robots-Tag": "noindex, nofollow",
     },

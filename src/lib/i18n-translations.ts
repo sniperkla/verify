@@ -137,6 +137,14 @@ export const translations = {
     summarizingDesc: "Summarizing…",
     viewProfile: "View Profile",
     hideProfile: "Hide",
+
+    // Edit submission
+    btnEdit: "Edit",
+    editSubmission: "Edit Submission",
+    saveChanges: "Save changes",
+    saving: "Saving...",
+    cancel: "Cancel",
+    editFailed: "Failed to save changes.",
   },
   th: {
     // Landing Page
@@ -276,6 +284,14 @@ export const translations = {
     summarizingDesc: "กำลังสรุป…",
     viewProfile: "ดูโปรไฟล์",
     hideProfile: "ซ่อน",
+
+    // Edit submission
+    btnEdit: "แก้ไข",
+    editSubmission: "แก้ไขข้อมูล",
+    saveChanges: "บันทึกการเปลี่ยนแปลง",
+    saving: "กำลังบันทึก...",
+    cancel: "ยกเลิก",
+    editFailed: "ไม่สามารถบันทึกข้อมูลได้",
   },
 } as const;
 

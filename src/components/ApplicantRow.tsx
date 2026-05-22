@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import RemoveApplicantButton from "@/components/RemoveApplicantButton";
+import EditApplicantPanel from "@/components/EditApplicantPanel";
 import StatusSelect from "@/components/StatusSelect";
 import { useTranslation } from "@/lib/i18n-client";
 import { type TranslationKeys } from "@/lib/i18n-translations";
@@ -27,6 +28,7 @@ export default function ApplicantRow({
   applicantId,
   when,
   canRemove,
+  canEdit,
   description,
   faceImage,
   idFaceBox,
@@ -41,6 +43,7 @@ export default function ApplicantRow({
   applicantId: string;
   when: string;
   canRemove: boolean;
+  canEdit: boolean;
   description: string;
   faceImage: string | null;
   idFaceBox: FaceBox | null;
@@ -55,6 +58,7 @@ export default function ApplicantRow({
   const { t } = useTranslation();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [currentStatus, setCurrentStatus] = useState<"pending" | "reviewing" | "done">(status);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -213,9 +217,12 @@ export default function ApplicantRow({
                   applicationImages={applicationImages}
                   applicationPageCount={applicationPageCount}
                   canRemove={canRemove}
+                  canEdit={canEdit}
                   applicantId={applicantId}
                   buildFileUrl={buildFileUrl}
                   setOpen={setOpen}
+                  editOpen={editOpen}
+                  setEditOpen={setEditOpen}
                   t={t}
                 />
               </div>
@@ -269,9 +276,12 @@ export default function ApplicantRow({
                 applicationImages={applicationImages}
                 applicationPageCount={applicationPageCount}
                 canRemove={canRemove}
+                canEdit={canEdit}
                 applicantId={applicantId}
                 buildFileUrl={buildFileUrl}
                 setOpen={setOpen}
+                editOpen={editOpen}
+                setEditOpen={setEditOpen}
                 t={t}
               />
             </div>
@@ -279,6 +289,19 @@ export default function ApplicantRow({
           </div>
         </div>
       </div>
+
+      {/* ── Edit panel ───────────────────────────────────────── */}
+      {editOpen && (
+        <EditApplicantPanel
+          applicantId={applicantId}
+          initialDescription={description}
+          initialExtractedData={extractedData}
+          initialImage={image}
+          initialIdCard={idCard}
+          initialPdf={pdf}
+          onClose={() => setEditOpen(false)}
+        />
+      )}
 
       {/* ── Expanded detail panel ──────────────────────────────── */}
       {open ? (
@@ -386,9 +409,12 @@ function ActionButtons({
   applicationImages,
   applicationPageCount,
   canRemove,
+  canEdit,
   applicantId,
   buildFileUrl,
   setOpen,
+  editOpen,
+  setEditOpen,
   t,
 }: {
   open: boolean;
@@ -399,9 +425,12 @@ function ActionButtons({
   applicationImages?: UploadedFile[];
   applicationPageCount: number;
   canRemove: boolean;
+  canEdit: boolean;
   applicantId: string;
   buildFileUrl: (kind: "image" | "idCard" | "pdf" | "applicationImage", index?: number) => string;
   setOpen: (v: boolean | ((c: boolean) => boolean)) => void;
+  editOpen: boolean;
+  setEditOpen: (v: boolean) => void;
   t: (key: TranslationKeys) => string;
 }) {
   return (
@@ -472,6 +501,24 @@ function ActionButtons({
       ) : null}
 
       {canRemove ? <RemoveApplicantButton applicantId={applicantId} /> : null}
+
+      {/* Edit button — admin only */}
+      {canEdit ? (
+        <button
+          type="button"
+          onClick={() => setEditOpen(!editOpen)}
+          title={t("btnEdit")}
+          className={`rounded-lg p-1.5 transition-colors ${
+            editOpen
+              ? "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 dark:text-indigo-400"
+              : "text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:text-indigo-400 dark:hover:bg-indigo-950/40"
+          }`}
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+        </button>
+      ) : null}
     </>
   );
 }

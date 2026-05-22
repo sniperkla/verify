@@ -66,16 +66,17 @@ export default function RemoveApplicantButton({ applicantId }: { applicantId: st
     );
   }
 
-  // Confirm — inline pill with cancel + confirm
+  // Confirm — compact icon-only pill (no text, so it never overflows on mobile)
   return (
     <div className="flex items-center gap-1">
       {error && (
         <span className="text-[9px] font-medium text-red-500">{error}</span>
       )}
-      <div className="flex items-center gap-1 rounded-lg border border-red-200 dark:border-red-800/50 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5">
-        <span className="text-[9px] font-bold text-red-600 dark:text-red-400 whitespace-nowrap">
-          {t("confirmRemoveSubmission")}?
-        </span>
+      <div className="flex items-center gap-0.5 rounded-lg border border-red-200 dark:border-red-800/50 bg-red-50 dark:bg-red-950/30 px-1 py-0.5">
+        {/* Trash icon (static, just signals context) */}
+        <svg className="h-3.5 w-3.5 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+        </svg>
         {/* Cancel */}
         <button
           type="button"
@@ -83,7 +84,7 @@ export default function RemoveApplicantButton({ applicantId }: { applicantId: st
           className="rounded p-0.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
           title="Cancel"
         >
-          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
@@ -92,9 +93,9 @@ export default function RemoveApplicantButton({ applicantId }: { applicantId: st
           type="button"
           onClick={handleRemove}
           className="rounded p-0.5 text-red-500 hover:text-red-700 dark:hover:text-red-300 transition-colors"
-          title="Confirm delete"
+          title={t("confirmRemoveSubmission")}
         >
-          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
           </svg>
         </button>
